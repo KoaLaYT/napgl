@@ -1,0 +1,14 @@
+.{
+    .name = .napgl,
+    .version = "0.0.0",
+    .fingerprint = 0x59f31614c841baec,
+    .minimum_zig_version = "0.15.1",
+    .dependencies = .{},
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "LICENSE",
+        "README.md",
+    },
+}
