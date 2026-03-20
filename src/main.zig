@@ -73,18 +73,9 @@ pub fn main() !void {
     gl.glBindBuffer(gl.GL_ARRAY_BUFFER, vbo);
     gl.glVertexAttribPointer(0, 3, gl.GL_FLOAT, gl.GL_FALSE, 0, null);
 
-    const vs = gl.glCreateShader(gl.GL_VERTEX_SHADER);
-    gl.glShaderSource(vs, 1, @ptrCast(&vertex_shader), null);
-    gl.glCompileShader(vs);
-
-    const fs = gl.glCreateShader(gl.GL_FRAGMENT_SHADER);
-    gl.glShaderSource(fs, 1, @ptrCast(&fragment_shader), null);
-    gl.glCompileShader(fs);
-
-    const shader_program = gl.glCreateProgram();
-    gl.glAttachShader(shader_program, fs);
-    gl.glAttachShader(shader_program, vs);
-    gl.glLinkProgram(shader_program);
+    const vs = try compile_shader(gl.GL_VERTEX_SHADER, vertex_shader);
+    const fs = try compile_shader(gl.GL_FRAGMENT_SHADER, fragment_shader);
+    const shader_program = try link_program(vs, fs);
 
     while (glfw3.glfwWindowShouldClose(window) == 0) {
         update_fps_counter(window);
@@ -101,6 +92,55 @@ pub fn main() !void {
             glfw3.glfwSetWindowShouldClose(window, 1);
         }
     }
+}
+
+fn compile_shader(typ: gl.GLenum, source: []const u8) !gl.GLuint {
+    const shader_index = gl.glCreateShader(typ);
+    gl.glShaderSource(shader_index, 1, @ptrCast(&source), null);
+    gl.glCompileShader(shader_index);
+
+    var params: c_int = -1;
+    gl.glGetShaderiv(shader_index, gl.GL_COMPILE_STATUS, &params);
+    if (gl.GL_TRUE != params) {
+        std.log.err("ERROR: GL shader index {d} did not compile", .{shader_index});
+        print_shader_info_log(shader_index);
+        return error.CompileShaderFailed;
+    }
+
+    return shader_index;
+}
+
+fn link_program(vs: gl.GLuint, fs: gl.GLuint) !gl.GLuint {
+    const shader_program = gl.glCreateProgram();
+    gl.glAttachShader(shader_program, fs);
+    gl.glAttachShader(shader_program, vs);
+    gl.glLinkProgram(shader_program);
+
+    var params: c_int = -1;
+    gl.glGetProgramiv(shader_program, gl.GL_LINK_STATUS, &params);
+    if (gl.GL_TRUE != params) {
+        std.log.err("ERROR: could not link shader programme GL index {d}", .{shader_program});
+        print_program_info_log(shader_program);
+        return error.LinkProgramFailed;
+    }
+
+    return shader_program;
+}
+
+fn print_shader_info_log(shader_index: gl.GLuint) void {
+    const max_length = 2048;
+    var actual_length: gl.GLsizei = 0;
+    var log: [2048]u8 = undefined;
+    gl.glGetShaderInfoLog(shader_index, max_length, &actual_length, &log);
+    std.log.err("shader info log for GL index {d}:\n{s}", .{ shader_index, log[0..@intCast(actual_length)] });
+}
+
+fn print_program_info_log(program: gl.GLuint) void {
+    const max_length = 2048;
+    var actual_length: gl.GLsizei = 0;
+    var log: [2048]u8 = undefined;
+    gl.glGetProgramInfoLog(program, max_length, &actual_length, &log);
+    std.log.err("program info log for GL index {d}:\n{s}", .{ program, log[0..@intCast(actual_length)] });
 }
 
 fn glfw_error_callback(err: c_int, description: [*c]const u8) callconv(.c) void {
