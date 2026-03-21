@@ -5,23 +5,8 @@ const gl = @import("c").gl;
 var g_previous_seconds: f64 = 0;
 var g_frame_count: u64 = 0;
 
-const vertex_shader =
-    \\#version 410
-    \\
-    \\in vec3 vp;
-    \\void main () {
-    \\  gl_Position = vec4 (vp, 1.0);
-    \\}
-;
-
-const fragment_shader =
-    \\#version 410
-    \\
-    \\out vec4 frag_colour;
-    \\void main () {
-    \\  frag_colour = vec4 (0.5, 0.0, 0.5, 1.0);
-    \\}
-;
+const vertex_shader = @embedFile("shaders/triangle.vert");
+const fragment_shader = @embedFile("shaders/triangle.frag");
 
 pub fn main() !void {
     _ = glfw3.glfwSetErrorCallback(glfw_error_callback);
@@ -54,6 +39,9 @@ pub fn main() !void {
     // tell GL to only draw onto a pixel if the shape is closer to the viewer
     gl.glEnable(gl.GL_DEPTH_TEST); // enable depth-testing
     gl.glDepthFunc(gl.GL_LESS); // depth-testing interprets a smaller value as "closer"
+    gl.glEnable(gl.GL_CULL_FACE);
+    gl.glCullFace(gl.GL_BACK);
+    gl.glFrontFace(gl.GL_CW);
 
     const points = [_]f32{
         0.0,  0.5,  0.0,
@@ -61,17 +49,31 @@ pub fn main() !void {
         -0.5, -0.5, 0.0,
     };
 
-    var vbo: gl.GLuint = 0;
-    gl.glGenBuffers(1, &vbo);
-    gl.glBindBuffer(gl.GL_ARRAY_BUFFER, vbo);
+    const colors = [_]f32{
+        1.0, 0.0, 0.0,
+        0.0, 1.0, 0.0,
+        0.0, 0.0, 1.0,
+    };
+
+    var points_vbo: gl.GLuint = 0;
+    gl.glGenBuffers(1, &points_vbo);
+    gl.glBindBuffer(gl.GL_ARRAY_BUFFER, points_vbo);
     gl.glBufferData(gl.GL_ARRAY_BUFFER, @sizeOf(@TypeOf(points)), &points, gl.GL_STATIC_DRAW);
+
+    var colors_vbo: gl.GLuint = 0;
+    gl.glGenBuffers(1, &colors_vbo);
+    gl.glBindBuffer(gl.GL_ARRAY_BUFFER, colors_vbo);
+    gl.glBufferData(gl.GL_ARRAY_BUFFER, @sizeOf(@TypeOf(colors)), &colors, gl.GL_STATIC_DRAW);
 
     var vao: gl.GLuint = 0;
     gl.glGenVertexArrays(1, &vao);
     gl.glBindVertexArray(vao);
-    gl.glEnableVertexAttribArray(0);
-    gl.glBindBuffer(gl.GL_ARRAY_BUFFER, vbo);
+    gl.glBindBuffer(gl.GL_ARRAY_BUFFER, points_vbo);
     gl.glVertexAttribPointer(0, 3, gl.GL_FLOAT, gl.GL_FALSE, 0, null);
+    gl.glBindBuffer(gl.GL_ARRAY_BUFFER, colors_vbo);
+    gl.glVertexAttribPointer(1, 3, gl.GL_FLOAT, gl.GL_FALSE, 0, null);
+    gl.glEnableVertexAttribArray(0);
+    gl.glEnableVertexAttribArray(1);
 
     const vs = try compile_shader(gl.GL_VERTEX_SHADER, vertex_shader);
     const fs = try compile_shader(gl.GL_FRAGMENT_SHADER, fragment_shader);
