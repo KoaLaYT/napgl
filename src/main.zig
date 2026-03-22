@@ -1,6 +1,10 @@
 const std = @import("std");
 const glfw3 = @import("c").glfw3;
 const gl = @import("c").gl;
+const Vec3 = @import("Vec3.zig");
+const Mat4 = @import("Mat4.zig");
+
+const degree_in_rad: f32 = std.math.pi / 180.0;
 
 var g_previous_seconds: f64 = 0;
 var g_frame_count: u64 = 0;
@@ -21,7 +25,10 @@ pub fn main() !void {
     glfw3.glfwWindowHint(glfw3.GLFW_OPENGL_FORWARD_COMPAT, gl.GL_TRUE);
     glfw3.glfwWindowHint(glfw3.GLFW_OPENGL_PROFILE, glfw3.GLFW_OPENGL_CORE_PROFILE);
 
-    const window = glfw3.glfwCreateWindow(640, 480, "napgl", null, null);
+    const width = 640;
+    const height = 480;
+    const aspect = @as(f32, @floatFromInt(width)) / @as(f32, @floatFromInt(height));
+    const window = glfw3.glfwCreateWindow(width, height, "napgl", null, null);
     if (window == null) {
         std.log.err("glfwCreateWindow failed", .{});
         return;
@@ -78,20 +85,68 @@ pub fn main() !void {
     const vs = try compile_shader(gl.GL_VERTEX_SHADER, vertex_shader);
     const fs = try compile_shader(gl.GL_FRAGMENT_SHADER, fragment_shader);
     const shader_program = try link_program(vs, fs);
+    const view_location = gl.glGetUniformLocation(shader_program, "view");
+    const proj_location = gl.glGetUniformLocation(shader_program, "proj");
+
+    const cam_speed: f32 = 1.0;
+    const cam_yaw_speed: f32 = 10; // in degree
+    var cam_pos = Vec3.init(0, 0, 2);
+    var cam_yaw: f32 = 0; // in degree
+    const T = Mat4.translate(-cam_pos.x, -cam_pos.y, -cam_pos.z);
+    const R = Mat4.rotate_y(-cam_yaw * degree_in_rad);
+    var view_mat = Mat4.mul(R, T);
+    const proj_mat = Mat4.perspective(67.0 * degree_in_rad, aspect, 0.1, 100.0);
 
     while (glfw3.glfwWindowShouldClose(window) == 0) {
-        update_fps_counter(window);
+        const elapsed_seconds = get_elapsed_seconds();
+        update_fps_counter(window, elapsed_seconds);
 
         gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT);
 
         gl.glUseProgram(shader_program);
+        gl.glUniformMatrix4fv(view_location, 1, gl.GL_FALSE, &view_mat.arr);
+        gl.glUniformMatrix4fv(proj_location, 1, gl.GL_FALSE, &proj_mat.arr);
         gl.glBindVertexArray(vao);
         gl.glDrawArrays(gl.GL_TRIANGLES, 0, 3);
 
         glfw3.glfwSwapBuffers(window);
         glfw3.glfwPollEvents();
+
         if (glfw3.GLFW_PRESS == glfw3.glfwGetKey(window, glfw3.GLFW_KEY_Q)) {
             glfw3.glfwSetWindowShouldClose(window, 1);
+            continue;
+        }
+
+        var cam_moved = false;
+        if (glfw3.GLFW_PRESS == glfw3.glfwGetKey(window, glfw3.GLFW_KEY_A)) {
+            cam_pos.x -= cam_speed * elapsed_seconds;
+            cam_moved = true;
+        }
+        if (glfw3.GLFW_PRESS == glfw3.glfwGetKey(window, glfw3.GLFW_KEY_D)) {
+            cam_pos.x += cam_speed * elapsed_seconds;
+            cam_moved = true;
+        }
+        if (glfw3.GLFW_PRESS == glfw3.glfwGetKey(window, glfw3.GLFW_KEY_W)) {
+            cam_pos.z -= cam_speed * elapsed_seconds;
+            cam_moved = true;
+        }
+        if (glfw3.GLFW_PRESS == glfw3.glfwGetKey(window, glfw3.GLFW_KEY_S)) {
+            cam_pos.z += cam_speed * elapsed_seconds;
+            cam_moved = true;
+        }
+        if (glfw3.GLFW_PRESS == glfw3.glfwGetKey(window, glfw3.GLFW_KEY_LEFT)) {
+            cam_yaw += cam_yaw_speed * elapsed_seconds;
+            cam_moved = true;
+        }
+        if (glfw3.GLFW_PRESS == glfw3.glfwGetKey(window, glfw3.GLFW_KEY_RIGHT)) {
+            cam_yaw -= cam_yaw_speed * elapsed_seconds;
+            cam_moved = true;
+        }
+
+        if (cam_moved) {
+            const TT = Mat4.translate(-cam_pos.x, -cam_pos.y, -cam_pos.z);
+            const RR = Mat4.rotate_y(-cam_yaw * degree_in_rad);
+            view_mat = Mat4.mul(RR, TT);
         }
     }
 }
@@ -196,13 +251,16 @@ fn log_gl_params() void {
     std.log.info("-----------------------------", .{});
 }
 
-fn update_fps_counter(window: ?*glfw3.GLFWwindow) void {
+fn get_elapsed_seconds() f32 {
     const current_seconds = glfw3.glfwGetTime();
     const elapsed_seconds = current_seconds - g_previous_seconds;
+    g_previous_seconds = current_seconds;
+    return @floatCast(elapsed_seconds);
+}
 
+fn update_fps_counter(window: ?*glfw3.GLFWwindow, elapsed_seconds: f32) void {
     // limit text updates to 4 per second
     if (elapsed_seconds > 0.25) {
-        g_previous_seconds = current_seconds;
         var buf: [128]u8 = undefined;
         const fps = @as(f64, @floatFromInt(g_frame_count)) / elapsed_seconds;
         const title = std.fmt.bufPrintZ(&buf, "napgl @ fps: {d:.2}", .{fps}) catch unreachable;
