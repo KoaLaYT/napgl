@@ -18,6 +18,20 @@ pub fn add(a: Self, b: Self) Self {
     return .{ .x = a.x + b.x, .y = a.y + b.y, .z = a.z + b.z };
 }
 
+pub fn sub(a: Self, b: Self) Self {
+    return .{ .x = a.x - b.x, .y = a.y - b.y, .z = a.z - b.z };
+}
+
 pub fn scale(self: Self, s: f32) Self {
     return .{ .x = self.x * s, .y = self.y * s, .z = self.z * s };
+}
+
+pub fn dot(a: Self, b: Self) f32 {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+pub fn normalize(self: Self) Self {
+    const len = @sqrt(self.x * self.x + self.y * self.y + self.z * self.z);
+    if (len == 0.0) return self;
+    return self.scale(1.0 / len);
 }

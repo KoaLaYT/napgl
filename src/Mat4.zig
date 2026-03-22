@@ -4,6 +4,7 @@ arr: [16]f32,
 
 const Self = @This();
 const Vec3 = @import("Vec3.zig");
+const Vec4 = @import("Vec4.zig");
 
 /// Returns a 4x4 zero matrix.
 pub fn zero() Self {
@@ -33,6 +34,17 @@ pub fn mul(a: Self, b: Self) Self {
         }
     }
     return result;
+}
+
+/// Multiply this matrix by a Vec4.
+pub fn mul_vec4(self: Self, v: Vec4) Vec4 {
+    const a = self.arr;
+    return Vec4.init(
+        a[0] * v.x + a[4] * v.y + a[8] * v.z + a[12] * v.w,
+        a[1] * v.x + a[5] * v.y + a[9] * v.z + a[13] * v.w,
+        a[2] * v.x + a[6] * v.y + a[10] * v.z + a[14] * v.w,
+        a[3] * v.x + a[7] * v.y + a[11] * v.z + a[15] * v.w,
+    );
 }
 
 /// Rotation around X axis by `rad` radians.
@@ -88,6 +100,53 @@ pub fn translate(v: Vec3) Self {
     m.arr[13] = v.y;
     m.arr[14] = v.z;
     return m;
+}
+
+/// Returns the inverse of the matrix, or `null` if it is singular.
+pub fn inverse(self: Self) ?Self {
+    const m = self.arr;
+
+    // Compute 2x2 sub-determinants (pairs from columns 0-1 and columns 2-3)
+    const s0 = m[0] * m[5] - m[4] * m[1];
+    const s1 = m[0] * m[9] - m[8] * m[1];
+    const s2 = m[0] * m[13] - m[12] * m[1];
+    const s3 = m[4] * m[9] - m[8] * m[5];
+    const s4 = m[4] * m[13] - m[12] * m[5];
+    const s5 = m[8] * m[13] - m[12] * m[9];
+
+    const c5 = m[10] * m[15] - m[14] * m[11];
+    const c4 = m[6] * m[15] - m[14] * m[7];
+    const c3 = m[6] * m[11] - m[10] * m[7];
+    const c2 = m[2] * m[15] - m[14] * m[3];
+    const c1 = m[2] * m[11] - m[10] * m[3];
+    const c0 = m[2] * m[7] - m[6] * m[3];
+
+    const det = s0 * c5 - s1 * c4 + s2 * c3 + s3 * c2 - s4 * c1 + s5 * c0;
+    if (@abs(det) < 1e-10) return null;
+
+    const inv_det = 1.0 / det;
+
+    return .{ .arr = .{
+        (m[5] * c5 - m[9] * c4 + m[13] * c3) * inv_det,
+        (-m[1] * c5 + m[9] * c2 - m[13] * c1) * inv_det,
+        (m[1] * c4 - m[5] * c2 + m[13] * c0) * inv_det,
+        (-m[1] * c3 + m[5] * c1 - m[9] * c0) * inv_det,
+
+        (-m[4] * c5 + m[8] * c4 - m[12] * c3) * inv_det,
+        (m[0] * c5 - m[8] * c2 + m[12] * c1) * inv_det,
+        (-m[0] * c4 + m[4] * c2 - m[12] * c0) * inv_det,
+        (m[0] * c3 - m[4] * c1 + m[8] * c0) * inv_det,
+
+        (m[7] * s5 - m[11] * s4 + m[15] * s3) * inv_det,
+        (-m[3] * s5 + m[11] * s2 - m[15] * s1) * inv_det,
+        (m[3] * s4 - m[7] * s2 + m[15] * s0) * inv_det,
+        (-m[3] * s3 + m[7] * s1 - m[11] * s0) * inv_det,
+
+        (-m[6] * s5 + m[10] * s4 - m[14] * s3) * inv_det,
+        (m[2] * s5 - m[10] * s2 + m[14] * s1) * inv_det,
+        (-m[2] * s4 + m[6] * s2 - m[14] * s0) * inv_det,
+        (m[2] * s3 - m[6] * s1 + m[10] * s0) * inv_det,
+    } };
 }
 
 /// Returns a perspective projection matrix

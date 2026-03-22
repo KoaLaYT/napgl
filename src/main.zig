@@ -2,10 +2,14 @@ const std = @import("std");
 const glfw3 = @import("c").glfw3;
 const gl = @import("c").gl;
 const Vec3 = @import("Vec3.zig");
+const Vec4 = @import("Vec4.zig");
 const Mat4 = @import("Mat4.zig");
 const Camera = @import("Camera.zig");
+const Cube = @import("Cube.zig");
+const Tile = @import("Tile.zig");
 
 const degree_in_rad: f32 = std.math.pi / 180.0;
+const world_up = Vec3.init(0, 1, 0);
 
 var g_previous_seconds: f64 = 0;
 var g_fps_seconds: f64 = 0;
@@ -14,8 +18,8 @@ var g_frame_count: u64 = 0;
 var g_mouse_x: f64 = 0;
 var g_mouse_y: f64 = 0;
 
-const vertex_shader = @embedFile("shaders/triangle.vert");
-const fragment_shader = @embedFile("shaders/triangle.frag");
+const vertex_shader = @embedFile("shaders/default.vert");
+const fragment_shader = @embedFile("shaders/default.frag");
 
 pub fn main() !void {
     _ = glfw3.glfwSetErrorCallback(glfw_error_callback);
@@ -56,81 +60,24 @@ pub fn main() !void {
     gl.glCullFace(gl.GL_BACK);
     gl.glFrontFace(gl.GL_CW);
 
-    // zig fmt: off
-    const points = [_]f32{
-        // front (+Z)
-        -0.5, -0.5,  0.5,  -0.5,  0.5,  0.5,   0.5, -0.5,  0.5,
-        -0.5,  0.5,  0.5,   0.5,  0.5,  0.5,   0.5, -0.5,  0.5,
-        // back (-Z)
-         0.5, -0.5, -0.5,   0.5,  0.5, -0.5,  -0.5, -0.5, -0.5,
-         0.5,  0.5, -0.5,  -0.5,  0.5, -0.5,  -0.5, -0.5, -0.5,
-        // right (+X)
-         0.5, -0.5,  0.5,   0.5,  0.5,  0.5,   0.5, -0.5, -0.5,
-         0.5,  0.5,  0.5,   0.5,  0.5, -0.5,   0.5, -0.5, -0.5,
-        // left (-X)
-        -0.5, -0.5, -0.5,  -0.5,  0.5, -0.5,  -0.5, -0.5,  0.5,
-        -0.5,  0.5, -0.5,  -0.5,  0.5,  0.5,  -0.5, -0.5,  0.5,
-        // top (+Y)
-        -0.5,  0.5,  0.5,  -0.5,  0.5, -0.5,   0.5,  0.5,  0.5,
-        -0.5,  0.5, -0.5,   0.5,  0.5, -0.5,   0.5,  0.5,  0.5,
-        // bottom (-Y)
-        -0.5, -0.5, -0.5,  -0.5, -0.5,  0.5,   0.5, -0.5, -0.5,
-        -0.5, -0.5,  0.5,   0.5, -0.5,  0.5,   0.5, -0.5, -0.5,
-    };
-
-    const colors = [_]f32{
-        // front: red
-        1.0, 0.0, 0.0,  1.0, 0.0, 0.0,  1.0, 0.0, 0.0,
-        1.0, 0.0, 0.0,  1.0, 0.0, 0.0,  1.0, 0.0, 0.0,
-        // back: cyan
-        0.0, 1.0, 1.0,  0.0, 1.0, 1.0,  0.0, 1.0, 1.0,
-        0.0, 1.0, 1.0,  0.0, 1.0, 1.0,  0.0, 1.0, 1.0,
-        // right: green
-        0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0,
-        0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0,
-        // left: magenta
-        1.0, 0.0, 1.0,  1.0, 0.0, 1.0,  1.0, 0.0, 1.0,
-        1.0, 0.0, 1.0,  1.0, 0.0, 1.0,  1.0, 0.0, 1.0,
-        // top: blue
-        0.0, 0.0, 1.0,  0.0, 0.0, 1.0,  0.0, 0.0, 1.0,
-        0.0, 0.0, 1.0,  0.0, 0.0, 1.0,  0.0, 0.0, 1.0,
-        // bottom: yellow
-        1.0, 1.0, 0.0,  1.0, 1.0, 0.0,  1.0, 1.0, 0.0,
-        1.0, 1.0, 0.0,  1.0, 1.0, 0.0,  1.0, 1.0, 0.0,
-    };
-    // zig fmt: on
-
-    var points_vbo: gl.GLuint = 0;
-    gl.glGenBuffers(1, &points_vbo);
-    gl.glBindBuffer(gl.GL_ARRAY_BUFFER, points_vbo);
-    gl.glBufferData(gl.GL_ARRAY_BUFFER, @sizeOf(@TypeOf(points)), &points, gl.GL_STATIC_DRAW);
-
-    var colors_vbo: gl.GLuint = 0;
-    gl.glGenBuffers(1, &colors_vbo);
-    gl.glBindBuffer(gl.GL_ARRAY_BUFFER, colors_vbo);
-    gl.glBufferData(gl.GL_ARRAY_BUFFER, @sizeOf(@TypeOf(colors)), &colors, gl.GL_STATIC_DRAW);
-
-    var vao: gl.GLuint = 0;
-    gl.glGenVertexArrays(1, &vao);
-    gl.glBindVertexArray(vao);
-    gl.glBindBuffer(gl.GL_ARRAY_BUFFER, points_vbo);
-    gl.glVertexAttribPointer(0, 3, gl.GL_FLOAT, gl.GL_FALSE, 0, null);
-    gl.glBindBuffer(gl.GL_ARRAY_BUFFER, colors_vbo);
-    gl.glVertexAttribPointer(1, 3, gl.GL_FLOAT, gl.GL_FALSE, 0, null);
-    gl.glEnableVertexAttribArray(0);
-    gl.glEnableVertexAttribArray(1);
-
     const vs = try compile_shader(gl.GL_VERTEX_SHADER, vertex_shader);
     const fs = try compile_shader(gl.GL_FRAGMENT_SHADER, fragment_shader);
     const shader_program = try link_program(vs, fs);
+    const world_location = gl.glGetUniformLocation(shader_program, "world");
     const view_location = gl.glGetUniformLocation(shader_program, "view");
     const proj_location = gl.glGetUniformLocation(shader_program, "proj");
+    const color_location = gl.glGetAttribLocation(shader_program, "vertex_color");
+
+    const cube = Cube.init();
+    const cube_world = Mat4.translate(Vec3.init(0, 0.5, 1));
+
+    const plane = Plane.init(world_location, color_location);
 
     const cam_speed: f32 = 5.0;
     const cam_rotate_speed: f32 = 60 * degree_in_rad; // in rad/s
     var cam = Camera.init(Vec3.init(0, 2, 5));
-    var view_mat = cam.view_matrix();
-    const proj_mat = Mat4.perspective(67.0 * degree_in_rad, aspect, 0.1, 100.0);
+    var view = cam.view_matrix();
+    const proj = Mat4.perspective(67.0 * degree_in_rad, aspect, 0.1, 100.0);
 
     while (glfw3.glfwWindowShouldClose(window) == 0) {
         const elapsed_seconds = get_elapsed_seconds();
@@ -139,10 +86,35 @@ pub fn main() !void {
         gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT);
 
         gl.glUseProgram(shader_program);
-        gl.glUniformMatrix4fv(view_location, 1, gl.GL_FALSE, &view_mat.arr);
-        gl.glUniformMatrix4fv(proj_location, 1, gl.GL_FALSE, &proj_mat.arr);
-        gl.glBindVertexArray(vao);
-        gl.glDrawArrays(gl.GL_TRIANGLES, 0, 36);
+        gl.glUniformMatrix4fv(view_location, 1, gl.GL_FALSE, &view.arr);
+        gl.glUniformMatrix4fv(proj_location, 1, gl.GL_FALSE, &proj.arr);
+
+        // ray-plane intersection (y = 0)
+        const hover_pos: ?Vec3 = blk: {
+            const ray = screen_to_world_ray(
+                g_mouse_x,
+                g_mouse_y,
+                width,
+                height,
+                proj,
+                view,
+            ) orelse break :blk null;
+
+            const b = Vec3.dot(ray, world_up);
+            if (@abs(b) < 1e-10) break :blk null;
+
+            const a = Vec3.dot(cam.pos, world_up);
+            const t = -a / b;
+            if (t < 0) break :blk null;
+
+            break :blk cam.pos.add(ray.scale(t));
+        };
+
+        // cube
+        gl.glUniformMatrix4fv(world_location, 1, gl.GL_FALSE, &cube_world.arr);
+        cube.draw();
+        // plane
+        plane.draw(hover_pos);
 
         glfw3.glfwSwapBuffers(window);
         glfw3.glfwPollEvents();
@@ -189,9 +161,39 @@ pub fn main() !void {
         }
 
         if (cam_moved) {
-            view_mat = cam.view_matrix();
+            view = cam.view_matrix();
         }
     }
+}
+
+/// Convert screen-space mouse coordinates to a normalized world-space ray direction.
+/// Returns null if the projection or view matrix is singular.
+fn screen_to_world_ray(mouse_x: f64, mouse_y: f64, vp_width: u32, vp_height: u32, proj: Mat4, view: Mat4) ?Vec3 {
+    const w: f64 = @floatFromInt(vp_width);
+    const h: f64 = @floatFromInt(vp_height);
+
+    if (mouse_x < 0 or mouse_x >= w or mouse_y < 0 or mouse_y >= h) {
+        return null;
+    }
+
+    // 1. Pixel → NDC  (y flipped: screen top = +1)
+    const ndc_x: f32 = @floatCast((2.0 * mouse_x) / w - 1.0);
+    const ndc_y: f32 = @floatCast(1.0 - (2.0 * mouse_y) / h);
+
+    // 2. NDC → clip space (point on the near plane, w = 1)
+    const clip = Vec4.init(ndc_x, ndc_y, -1.0, 1.0);
+
+    // 3. Clip → eye space
+    const inv_proj = proj.inverse() orelse return null;
+    const eye = inv_proj.mul_vec4(clip);
+    // We only care about the direction, so set z = -1 (into the screen) and w = 0
+    const eye_ray = Vec4.init(eye.x, eye.y, -1.0, 0.0);
+
+    // 4. Eye → world space
+    const inv_view = view.inverse() orelse return null;
+    const world = inv_view.mul_vec4(eye_ray);
+
+    return Vec3.init(world.x, world.y, world.z).normalize();
 }
 
 fn compile_shader(typ: gl.GLenum, source: []const u8) !gl.GLuint {
@@ -320,3 +322,53 @@ fn update_fps_counter(window: ?*glfw3.GLFWwindow) void {
 
     g_frame_count += 1;
 }
+
+const Plane = struct {
+    const half_size = 10;
+    const gray = [3]f32{ 0.5, 0.5, 0.5 };
+    const light_yellow = [3]f32{ 1.0, 1.0, 0.8 };
+    const red = [3]f32{ 1.0, 0.3, 0.3 };
+
+    tile: Tile,
+    world_location: gl.GLint,
+    color_location: gl.GLint,
+
+    fn init(world_location: gl.GLint, color_location: gl.GLint) Plane {
+        return .{
+            .tile = Tile.init(),
+            .world_location = world_location,
+            .color_location = color_location,
+        };
+    }
+
+    fn draw(self: Plane, hover_pos: ?Vec3) void {
+        var iz: i32 = -half_size;
+        while (iz < half_size) : (iz += 1) {
+            var ix: i32 = -half_size;
+            while (ix < half_size) : (ix += 1) {
+                const tile_world = Mat4.translate(Vec3.init(
+                    @floatFromInt(ix),
+                    0,
+                    @floatFromInt(iz),
+                ));
+                gl.glUniformMatrix4fv(self.world_location, 1, gl.GL_FALSE, &tile_world.arr);
+                const color = if (is_hover(ix, iz, hover_pos)) red else checker_color(ix, iz);
+                gl.glVertexAttrib3f(@intCast(self.color_location), color[0], color[1], color[2]);
+                self.tile.draw();
+            }
+        }
+    }
+
+    fn is_hover(ix: isize, iz: isize, hover_pos: ?Vec3) bool {
+        if (hover_pos) |pos| {
+            return ix == @as(i32, @intFromFloat(@floor(pos.x))) and
+                iz == @as(i32, @intFromFloat(@floor(pos.z)));
+        }
+
+        return false;
+    }
+
+    fn checker_color(ix: i32, iz: i32) [3]f32 {
+        return if (@mod(ix + iz, 2) == 0) gray else light_yellow;
+    }
+};
