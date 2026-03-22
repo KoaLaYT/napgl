@@ -3,6 +3,7 @@ const glfw3 = @import("c").glfw3;
 const gl = @import("c").gl;
 const Vec3 = @import("Vec3.zig");
 const Mat4 = @import("Mat4.zig");
+const Camera = @import("Camera.zig");
 
 const degree_in_rad: f32 = std.math.pi / 180.0;
 
@@ -50,17 +51,49 @@ pub fn main() !void {
     gl.glCullFace(gl.GL_BACK);
     gl.glFrontFace(gl.GL_CW);
 
+    // zig fmt: off
     const points = [_]f32{
-        0.0,  0.5,  0.0,
-        0.5,  -0.5, 0.0,
-        -0.5, -0.5, 0.0,
+        // front (+Z)
+        -0.5, -0.5,  0.5,  -0.5,  0.5,  0.5,   0.5, -0.5,  0.5,
+        -0.5,  0.5,  0.5,   0.5,  0.5,  0.5,   0.5, -0.5,  0.5,
+        // back (-Z)
+         0.5, -0.5, -0.5,   0.5,  0.5, -0.5,  -0.5, -0.5, -0.5,
+         0.5,  0.5, -0.5,  -0.5,  0.5, -0.5,  -0.5, -0.5, -0.5,
+        // right (+X)
+         0.5, -0.5,  0.5,   0.5,  0.5,  0.5,   0.5, -0.5, -0.5,
+         0.5,  0.5,  0.5,   0.5,  0.5, -0.5,   0.5, -0.5, -0.5,
+        // left (-X)
+        -0.5, -0.5, -0.5,  -0.5,  0.5, -0.5,  -0.5, -0.5,  0.5,
+        -0.5,  0.5, -0.5,  -0.5,  0.5,  0.5,  -0.5, -0.5,  0.5,
+        // top (+Y)
+        -0.5,  0.5,  0.5,  -0.5,  0.5, -0.5,   0.5,  0.5,  0.5,
+        -0.5,  0.5, -0.5,   0.5,  0.5, -0.5,   0.5,  0.5,  0.5,
+        // bottom (-Y)
+        -0.5, -0.5, -0.5,  -0.5, -0.5,  0.5,   0.5, -0.5, -0.5,
+        -0.5, -0.5,  0.5,   0.5, -0.5,  0.5,   0.5, -0.5, -0.5,
     };
 
     const colors = [_]f32{
-        1.0, 0.0, 0.0,
-        0.0, 1.0, 0.0,
-        0.0, 0.0, 1.0,
+        // front: red
+        1.0, 0.0, 0.0,  1.0, 0.0, 0.0,  1.0, 0.0, 0.0,
+        1.0, 0.0, 0.0,  1.0, 0.0, 0.0,  1.0, 0.0, 0.0,
+        // back: cyan
+        0.0, 1.0, 1.0,  0.0, 1.0, 1.0,  0.0, 1.0, 1.0,
+        0.0, 1.0, 1.0,  0.0, 1.0, 1.0,  0.0, 1.0, 1.0,
+        // right: green
+        0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0,
+        0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0,
+        // left: magenta
+        1.0, 0.0, 1.0,  1.0, 0.0, 1.0,  1.0, 0.0, 1.0,
+        1.0, 0.0, 1.0,  1.0, 0.0, 1.0,  1.0, 0.0, 1.0,
+        // top: blue
+        0.0, 0.0, 1.0,  0.0, 0.0, 1.0,  0.0, 0.0, 1.0,
+        0.0, 0.0, 1.0,  0.0, 0.0, 1.0,  0.0, 0.0, 1.0,
+        // bottom: yellow
+        1.0, 1.0, 0.0,  1.0, 1.0, 0.0,  1.0, 1.0, 0.0,
+        1.0, 1.0, 0.0,  1.0, 1.0, 0.0,  1.0, 1.0, 0.0,
     };
+    // zig fmt: on
 
     var points_vbo: gl.GLuint = 0;
     gl.glGenBuffers(1, &points_vbo);
@@ -88,13 +121,10 @@ pub fn main() !void {
     const view_location = gl.glGetUniformLocation(shader_program, "view");
     const proj_location = gl.glGetUniformLocation(shader_program, "proj");
 
-    const cam_speed: f32 = 1.0;
-    const cam_yaw_speed: f32 = 10; // in degree
-    var cam_pos = Vec3.init(0, 0, 2);
-    var cam_yaw: f32 = 0; // in degree
-    const T = Mat4.translate(-cam_pos.x, -cam_pos.y, -cam_pos.z);
-    const R = Mat4.rotate_y(-cam_yaw * degree_in_rad);
-    var view_mat = Mat4.mul(R, T);
+    const cam_speed: f32 = 5.0;
+    const cam_rotate_speed: f32 = 60 * degree_in_rad; // in rad/s
+    var cam = Camera.init(Vec3.init(0, 2, 5));
+    var view_mat = cam.view_matrix();
     const proj_mat = Mat4.perspective(67.0 * degree_in_rad, aspect, 0.1, 100.0);
 
     while (glfw3.glfwWindowShouldClose(window) == 0) {
@@ -107,7 +137,7 @@ pub fn main() !void {
         gl.glUniformMatrix4fv(view_location, 1, gl.GL_FALSE, &view_mat.arr);
         gl.glUniformMatrix4fv(proj_location, 1, gl.GL_FALSE, &proj_mat.arr);
         gl.glBindVertexArray(vao);
-        gl.glDrawArrays(gl.GL_TRIANGLES, 0, 3);
+        gl.glDrawArrays(gl.GL_TRIANGLES, 0, 36);
 
         glfw3.glfwSwapBuffers(window);
         glfw3.glfwPollEvents();
@@ -118,35 +148,43 @@ pub fn main() !void {
         }
 
         var cam_moved = false;
+        const fwd = cam.forward();
+        const rgt = cam.right();
         if (glfw3.GLFW_PRESS == glfw3.glfwGetKey(window, glfw3.GLFW_KEY_A)) {
-            cam_pos.x -= cam_speed * elapsed_seconds;
+            cam.pos = cam.pos.add(rgt.scale(-cam_speed * elapsed_seconds));
             cam_moved = true;
         }
         if (glfw3.GLFW_PRESS == glfw3.glfwGetKey(window, glfw3.GLFW_KEY_D)) {
-            cam_pos.x += cam_speed * elapsed_seconds;
+            cam.pos = cam.pos.add(rgt.scale(cam_speed * elapsed_seconds));
             cam_moved = true;
         }
         if (glfw3.GLFW_PRESS == glfw3.glfwGetKey(window, glfw3.GLFW_KEY_W)) {
-            cam_pos.z -= cam_speed * elapsed_seconds;
+            cam.pos = cam.pos.add(fwd.scale(cam_speed * elapsed_seconds));
             cam_moved = true;
         }
         if (glfw3.GLFW_PRESS == glfw3.glfwGetKey(window, glfw3.GLFW_KEY_S)) {
-            cam_pos.z += cam_speed * elapsed_seconds;
+            cam.pos = cam.pos.add(fwd.scale(-cam_speed * elapsed_seconds));
             cam_moved = true;
         }
         if (glfw3.GLFW_PRESS == glfw3.glfwGetKey(window, glfw3.GLFW_KEY_LEFT)) {
-            cam_yaw += cam_yaw_speed * elapsed_seconds;
+            cam.rotate(cam_rotate_speed * elapsed_seconds, 0);
             cam_moved = true;
         }
         if (glfw3.GLFW_PRESS == glfw3.glfwGetKey(window, glfw3.GLFW_KEY_RIGHT)) {
-            cam_yaw -= cam_yaw_speed * elapsed_seconds;
+            cam.rotate(-cam_rotate_speed * elapsed_seconds, 0);
+            cam_moved = true;
+        }
+        if (glfw3.GLFW_PRESS == glfw3.glfwGetKey(window, glfw3.GLFW_KEY_UP)) {
+            cam.rotate(0, -cam_rotate_speed * elapsed_seconds);
+            cam_moved = true;
+        }
+        if (glfw3.GLFW_PRESS == glfw3.glfwGetKey(window, glfw3.GLFW_KEY_DOWN)) {
+            cam.rotate(0, cam_rotate_speed * elapsed_seconds);
             cam_moved = true;
         }
 
         if (cam_moved) {
-            const TT = Mat4.translate(-cam_pos.x, -cam_pos.y, -cam_pos.z);
-            const RR = Mat4.rotate_y(-cam_yaw * degree_in_rad);
-            view_mat = Mat4.mul(RR, TT);
+            view_mat = cam.view_matrix();
         }
     }
 }

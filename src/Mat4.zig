@@ -3,6 +3,7 @@
 arr: [16]f32,
 
 const Self = @This();
+const Vec3 = @import("Vec3.zig");
 
 /// Returns a 4x4 zero matrix.
 pub fn zero() Self {
@@ -81,11 +82,11 @@ pub fn scale(x: f32, y: f32, z: f32) Self {
 }
 
 /// Returns a 4x4 translation matrix.
-pub fn translate(x: f32, y: f32, z: f32) Self {
+pub fn translate(v: Vec3) Self {
     var m = identity();
-    m.arr[12] = x;
-    m.arr[13] = y;
-    m.arr[14] = z;
+    m.arr[12] = v.x;
+    m.arr[13] = v.y;
+    m.arr[14] = v.z;
     return m;
 }
 
