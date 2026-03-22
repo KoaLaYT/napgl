@@ -8,7 +8,11 @@ const Camera = @import("Camera.zig");
 const degree_in_rad: f32 = std.math.pi / 180.0;
 
 var g_previous_seconds: f64 = 0;
+var g_fps_seconds: f64 = 0;
 var g_frame_count: u64 = 0;
+
+var g_mouse_x: f64 = 0;
+var g_mouse_y: f64 = 0;
 
 const vertex_shader = @embedFile("shaders/triangle.vert");
 const fragment_shader = @embedFile("shaders/triangle.frag");
@@ -35,6 +39,7 @@ pub fn main() !void {
         return;
     }
     glfw3.glfwMakeContextCurrent(window);
+    _ = glfw3.glfwSetCursorPosCallback(window, cursor_pos_callback);
 
     const version = gl.gladLoadGL(glfw3.glfwGetProcAddress);
     if (version == 0) {
@@ -129,7 +134,7 @@ pub fn main() !void {
 
     while (glfw3.glfwWindowShouldClose(window) == 0) {
         const elapsed_seconds = get_elapsed_seconds();
-        update_fps_counter(window, elapsed_seconds);
+        update_fps_counter(window);
 
         gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT);
 
@@ -238,6 +243,11 @@ fn print_program_info_log(program: gl.GLuint) void {
     std.log.err("program info log for GL index {d}:\n{s}", .{ program, log[0..@intCast(actual_length)] });
 }
 
+fn cursor_pos_callback(_: ?*glfw3.GLFWwindow, xpos: f64, ypos: f64) callconv(.c) void {
+    g_mouse_x = xpos;
+    g_mouse_y = ypos;
+}
+
 fn glfw_error_callback(err: c_int, description: [*c]const u8) callconv(.c) void {
     std.log.err("GLFW ERROR: code {d}, msg: {s}", .{ err, description });
 }
@@ -293,17 +303,19 @@ fn get_elapsed_seconds() f32 {
     const current_seconds = glfw3.glfwGetTime();
     const elapsed_seconds = current_seconds - g_previous_seconds;
     g_previous_seconds = current_seconds;
+    g_fps_seconds += elapsed_seconds;
     return @floatCast(elapsed_seconds);
 }
 
-fn update_fps_counter(window: ?*glfw3.GLFWwindow, elapsed_seconds: f32) void {
+fn update_fps_counter(window: ?*glfw3.GLFWwindow) void {
     // limit text updates to 4 per second
-    if (elapsed_seconds > 0.25) {
+    if (g_fps_seconds > 0.25) {
         var buf: [128]u8 = undefined;
-        const fps = @as(f64, @floatFromInt(g_frame_count)) / elapsed_seconds;
+        const fps = @as(f64, @floatFromInt(g_frame_count)) / g_fps_seconds;
         const title = std.fmt.bufPrintZ(&buf, "napgl @ fps: {d:.2}", .{fps}) catch unreachable;
         glfw3.glfwSetWindowTitle(window, title.ptr);
         g_frame_count = 0;
+        g_fps_seconds = 0;
     }
 
     g_frame_count += 1;
