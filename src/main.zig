@@ -5,6 +5,7 @@ const Vec3 = @import("Vec3.zig");
 const Vec4 = @import("Vec4.zig");
 const Mat4 = @import("Mat4.zig");
 const Camera = @import("Camera.zig");
+const control = @import("control.zig");
 const Cube = @import("Cube.zig");
 const Tile = @import("Tile.zig");
 
@@ -73,8 +74,6 @@ pub fn main() !void {
 
     const plane = Plane.init(world_location, color_location);
 
-    const cam_speed: f32 = 5.0;
-    const cam_rotate_speed: f32 = 60 * degree_in_rad; // in rad/s
     var cam = Camera.init(Vec3.init(0, 2, 5));
     var view = cam.view_matrix();
     const proj = Mat4.perspective(67.0 * degree_in_rad, aspect, 0.1, 100.0);
@@ -125,39 +124,11 @@ pub fn main() !void {
         }
 
         var cam_moved = false;
-        const fwd = cam.forward();
-        const rgt = cam.right();
-        if (glfw3.GLFW_PRESS == glfw3.glfwGetKey(window, glfw3.GLFW_KEY_A)) {
-            cam.pos = cam.pos.add(rgt.scale(-cam_speed * elapsed_seconds));
-            cam_moved = true;
-        }
-        if (glfw3.GLFW_PRESS == glfw3.glfwGetKey(window, glfw3.GLFW_KEY_D)) {
-            cam.pos = cam.pos.add(rgt.scale(cam_speed * elapsed_seconds));
-            cam_moved = true;
-        }
-        if (glfw3.GLFW_PRESS == glfw3.glfwGetKey(window, glfw3.GLFW_KEY_W)) {
-            cam.pos = cam.pos.add(fwd.scale(cam_speed * elapsed_seconds));
-            cam_moved = true;
-        }
-        if (glfw3.GLFW_PRESS == glfw3.glfwGetKey(window, glfw3.GLFW_KEY_S)) {
-            cam.pos = cam.pos.add(fwd.scale(-cam_speed * elapsed_seconds));
-            cam_moved = true;
-        }
-        if (glfw3.GLFW_PRESS == glfw3.glfwGetKey(window, glfw3.GLFW_KEY_LEFT)) {
-            cam.rotate(cam_rotate_speed * elapsed_seconds, 0);
-            cam_moved = true;
-        }
-        if (glfw3.GLFW_PRESS == glfw3.glfwGetKey(window, glfw3.GLFW_KEY_RIGHT)) {
-            cam.rotate(-cam_rotate_speed * elapsed_seconds, 0);
-            cam_moved = true;
-        }
-        if (glfw3.GLFW_PRESS == glfw3.glfwGetKey(window, glfw3.GLFW_KEY_UP)) {
-            cam.rotate(0, -cam_rotate_speed * elapsed_seconds);
-            cam_moved = true;
-        }
-        if (glfw3.GLFW_PRESS == glfw3.glfwGetKey(window, glfw3.GLFW_KEY_DOWN)) {
-            cam.rotate(0, cam_rotate_speed * elapsed_seconds);
-            cam_moved = true;
+        inline for (control.key_map) |binding| {
+            if (glfw3.GLFW_PRESS == glfw3.glfwGetKey(window, binding.glfw_key)) {
+                cam.on_key(binding.key, elapsed_seconds);
+                cam_moved = true;
+            }
         }
 
         if (cam_moved) {

@@ -5,6 +5,10 @@ const std = @import("std");
 const Vec3 = @import("Vec3.zig");
 const Mat4 = @import("Mat4.zig");
 const Quat = @import("Quat.zig");
+const control = @import("control.zig");
+
+const move_speed: f32 = 5.0;
+const rotate_speed: f32 = 60.0 * std.math.pi / 180.0;
 
 pos: Vec3,
 yaw: f32,   // radians
@@ -43,6 +47,19 @@ pub fn forward(self: Self) Vec3 {
 /// Right direction on the XZ plane (yaw only, ignoring pitch).
 pub fn right(self: Self) Vec3 {
     return Vec3.init(@cos(self.yaw), 0, -@sin(self.yaw));
+}
+
+pub fn on_key(self: *Self, key: control.Key, elapsed: f32) void {
+    switch (key) {
+        .move_left => self.pos = self.pos.add(self.right().scale(-move_speed * elapsed)),
+        .move_right => self.pos = self.pos.add(self.right().scale(move_speed * elapsed)),
+        .move_forward => self.pos = self.pos.add(self.forward().scale(move_speed * elapsed)),
+        .move_back => self.pos = self.pos.add(self.forward().scale(-move_speed * elapsed)),
+        .rotate_left => self.rotate(rotate_speed * elapsed, 0),
+        .rotate_right => self.rotate(-rotate_speed * elapsed, 0),
+        .rotate_up => self.rotate(0, -rotate_speed * elapsed),
+        .rotate_down => self.rotate(0, rotate_speed * elapsed),
+    }
 }
 
 /// Compute the view matrix: inverse(orientation) * translate(-pos).
