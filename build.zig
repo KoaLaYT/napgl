@@ -10,15 +10,28 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
         .link_libc = true,
     });
-    c_mod.addIncludePath(b.path("thirdparty/glfw-3.4.bin.MACOS/include"));
+
     c_mod.addIncludePath(b.path("thirdparty/glad/include"));
     c_mod.addCSourceFile(.{
         .file = b.path("thirdparty/glad/src/gl.c"),
     });
-    c_mod.addObjectFile(b.path("thirdparty/glfw-3.4.bin.MACOS/lib-arm64/libglfw.3.dylib"));
-    c_mod.addRPath(b.path("thirdparty/glfw-3.4.bin.MACOS/lib-arm64"));
-    // c_mod.linkFramework("Cocoa", .{});
-    // c_mod.linkFramework("IOKit", .{});
+    switch (target.result.os.tag) {
+        .windows => {
+            c_mod.addIncludePath(b.path("thirdparty/glfw-3.4.bin.WIN64/include"));
+            c_mod.addObjectFile(b.path("thirdparty/glfw-3.4.bin.WIN64/lib-vc2022/glfw3.dll"));
+            // no rpath, just copy the dll and the exe into same dir
+        },
+        .macos => {
+            c_mod.addIncludePath(b.path("thirdparty/glfw-3.4.bin.MACOS/include"));
+            c_mod.addObjectFile(b.path("thirdparty/glfw-3.4.bin.MACOS/lib-arm64/libglfw.3.dylib"));
+            c_mod.addRPath(b.path("thirdparty/glfw-3.4.bin.MACOS/lib-arm64"));
+            // c_mod.linkFramework("Cocoa", .{});
+            // c_mod.linkFramework("IOKit", .{});
+        },
+        else => |tag| {
+            @panic(b.fmt("Unsupported target: {s}", .{@tagName(tag)}));
+        },
+    }
 
     const exe = b.addExecutable(.{
         .name = "napgl",
